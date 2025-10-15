@@ -1,0 +1,77 @@
+# ta_app/settings.py
+INSTALLED_APPS = [
+    ...,
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'orders',
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+# orders/models.py
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+class User(AbstractUser):
+    ROLES = (
+        ('merchandiser', 'Merchandiser'),
+        ('prod_manager', 'Production Manager'),
+        ('qa', 'Quality Assurance'),
+        ('management', 'Management'),
+    )
+    role = models.CharField(max_length=20, choices=ROLES)
+
+# orders/serializers.py
+from rest_framework import serializers
+from .models import User
+from django.contrib.auth.password_validation import validate_password
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password2 = serializers.CharField(write_only=True, required=True)
+
+    class Meta:
+        model = User
+        fields = ('username', 'password', 'password2', 'email', 'first_name', 'last_name', 'role')
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password2']:
+            raise serializers.ValidationError({"password": "Password fields didn't match."})
+        return attrs
+
+    def create(self, validated_data):
+        user = User.objects.create(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            role=validated_data['role'],
+        )
+        user.set_password(validated_data['password'])
+        user.save()
+        return user
+
+# orders/views.py
+from rest_framework import generics
+from .serializers import RegisterSerializer
+
+class RegisterView(generics.CreateAPIView):
+    serializer_class = RegisterSerializer
+
+# ta_app/urls.py
+from django.urls import path
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+from orders.views import RegisterView
+
+urlpatterns = [
+    path('api/register/', RegisterView.as_view(), name='register'),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+]
