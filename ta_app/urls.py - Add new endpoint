@@ -1,0 +1,6 @@
+# ta_app/urls.py - Add new endpoint
+from orders.views import PDFUploadView
+
+urlpatterns += [
+    path('api/upload_pdf/', PDFUploadView.as_view(), name='upload_pdf'),
+]
